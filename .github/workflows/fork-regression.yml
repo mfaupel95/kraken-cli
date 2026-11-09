@@ -1,0 +1,33 @@
+name: Fork regression
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [hermes/final-B-ci-20261109]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  name-regression:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Install repository MSRV on ephemeral runner
+        shell: bash
+        run: |
+          version=$(python -c 'import tomllib; print(tomllib.load(open("Cargo.toml", "rb"))["workspace"]["package"]["rust-version"])')
+          rustup toolchain install "$version" --profile minimal --component clippy
+          rustup override set "$version"
+      - name: Direct cross-platform name regression
+        shell: bash
+        run: |
+          rustc --edition 2024 --test crates/kraken-core/src/name.rs -o name-tests
+          ./name-tests
+      - run: cargo test --locked -p kraken-core
+      - run: cargo clippy --locked -p kraken-core --all-targets -- -D warnings
